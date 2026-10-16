@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>App del Clima — Vue.js</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f172a;
+      --surface: rgba(255,255,255,0.07);
+      --surface-solid: #1e293b;
+      --border: rgba(255,255,255,0.1);
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --primary: #38bdf8;
+      --primary-dim: rgba(56,189,248,0.15);
+      --card-shadow: 0 4px 24px rgba(0,0,0,0.3);
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    .app-wrapper {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 2rem 1rem;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--primary);
+      margin-bottom: 0.25rem;
+    }
+    .subtitle {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      margin-bottom: 2rem;
+    }
+
+    /* Search */
+    .search-box {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .search-input {
+      flex: 1;
+      padding: 0.75rem 1rem;
+      background: var(--surface-solid);
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-size: 0.95rem;
+      font-family: inherit;
+      transition: border-color 0.15s;
+    }
+    .search-input:focus { outline: none; border-color: var(--primary); }
+    .search-input::placeholder { color: var(--text-muted); }
+
+    .search-btn {
+      padding: 0.75rem 1.25rem;
+      background: var(--primary);
+      color: #0f172a;
+      border: none;
+      border-radius: 10px;
+      font-weight: 700;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: opacity 0.15s;
+      white-space: nowrap;
+    }
+    .search-btn:hover { opacity: 0.85; }
+    .search-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Suggestions */
+    .suggestions {
+      background: var(--surface-solid);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-bottom: 1rem;
+      overflow: hidden;
+    }
+    .suggestion-item {
+      padding: 0.75rem 1rem;
+      cursor: pointer;
+      border-bottom: 1px solid var(--border);
+      transition: background 0.1s;
+      font-size: 0.875rem;
+    }
+    .suggestion-item:last-child { border-bottom: none; }
+    .suggestion-item:hover { background: var(--surface); }
+    .suggestion-country { color: var(--text-muted); font-size: 0.8rem; }
+
+    /* Error / Loading */
+    .status-msg {
+      text-align: center;
+      padding: 2rem;
+      color: var(--text-muted);
+    }
+    .status-msg.error { color: #f87171; }
+    .spinner {
+      display: inline-block;
+      width: 20px; height: 20px;
+      border: 2px solid var(--border);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin-bottom: 0.5rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Weather card */
+    .weather-card {
+      background: linear-gradient(135deg, #1e3a5f, #0f2340);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.75rem;
+      margin-bottom: 1.5rem;
+      box-shadow: var(--card-shadow);
+    }
+
+    .city-name {
+      font-size: 1.6rem;
+      font-weight: 700;
+      margin-bottom: 0.2rem;
+    }
+    .city-meta {
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .current-weather {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .weather-icon { font-size: 4rem; line-height: 1; }
+    .temp-block {}
+    .temperature {
+      font-size: 3.5rem;
+      font-weight: 800;
+      color: var(--primary);
+      line-height: 1;
+    }
+    .weather-desc {
+      font-size: 1rem;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+      text-transform: capitalize;
+    }
+
+    .weather-details {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.75rem;
+    }
+    .detail-item {
+      background: var(--surface);
+      border-radius: 10px;
+      padding: 0.75rem;
+      text-align: center;
+    }
+    .detail-icon { font-size: 1.25rem; margin-bottom: 0.2rem; }
+    .detail-value { font-size: 1rem; font-weight: 700; color: var(--primary); }
+    .detail-label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+
+    /* Forecast */
+    .section-title {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 0.75rem;
+    }
+    .forecast-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 0.5rem;
+    }
+    .forecast-day {
+      background: var(--surface-solid);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.75rem 0.5rem;
+      text-align: center;
+      transition: background 0.15s;
+    }
+    .forecast-day:hover { background: var(--surface); }
+    .forecast-day-name { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.4rem; font-weight: 600; }
+    .forecast-icon { font-size: 1.5rem; margin-bottom: 0.4rem; }
+    .forecast-temp-max { font-size: 0.9rem; font-weight: 700; color: var(--text); }
+    .forecast-temp-min { font-size: 0.75rem; color: var(--text-muted); }
+
+    /* Recent searches */
+    .recent-searches {
+      margin-top: 1.5rem;
+    }
+    .recent-chips { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem; }
+    .recent-chip {
+      padding: 0.3rem 0.75rem;
+      background: var(--surface-solid);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      color: var(--text-muted);
+      transition: all 0.15s;
+    }
+    .recent-chip:hover { border-color: var(--primary); color: var(--primary); }
+
+    /* Landing empty state */
+    .empty-state {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: var(--text-muted);
+    }
+    .empty-state .big-icon { font-size: 4rem; margin-bottom: 1rem; }
+    .empty-state p { font-size: 0.9rem; line-height: 1.6; }
+
+    [v-cloak] { display: none; }
+  </style>
+</head>
+<body>
+<div id="app" v-cloak>
+  <div class="app-wrapper">
+    <h1>🌤️ ClimaVue</h1>
+    <p class="subtitle">Clima en tiempo real para cualquier ciudad del mundo</p>
+
+    <!-- Search -->
+    <div class="search-box">
+      <input
+        class="search-input"
+        type="text"
+        v-model="query"
+        @input="onInput"
+        @keyup.enter="searchCity"
+        placeholder="Buscar ciudad... (ej: Buenos Aires, Madrid)"
+        autocomplete="off"
+      />
+      <button class="search-btn" @click="searchCity" :disabled="loading || !query.trim()">
+        {{ loading ? '...' : '🔍 Buscar' }}
+      </button>
+    </div>
+
+    <!-- Suggestions -->
+    <div class="suggestions" v-if="suggestions.length > 0">
+      <div
+        class="suggestion-item"
+        v-for="s in suggestions"
+        :key="s.id"
+        @click="selectCity(s)"
+      >
+        <strong>{{ s.name }}</strong>
+        <span class="suggestion-country"> — {{ s.admin1 ? s.admin1 + ', ' : '' }}{{ s.country }}</span>
+      </div>
+    </div>
+
+    <!-- Error -->
+    <div class="status-msg error" v-if="error">⚠️ {{ error }}</div>
+
+    <!-- Loading -->
+    <div class="status-msg" v-if="loading && !weather">
+      <div class="spinner"></div>
+      <p>Obteniendo datos del clima...</p>
+    </div>
+
+    <!-- Weather result -->
+    <template v-if="weather && !loading">
+      <div class="weather-card">
+        <div class="city-name">{{ weather.city }}</div>
+        <div class="city-meta">{{ weather.country }} · Actualizado ahora</div>
+
+        <div class="current-weather">
+          <div class="weather-icon">{{ getWeatherIcon(weather.weathercode) }}</div>
+          <div class="temp-block">
+            <div class="temperature">{{ Math.round(weather.temperature) }}°C</div>
+            <div class="weather-desc">{{ getWeatherDesc(weather.weathercode) }}</div>
+          </div>
+        </div>
+
+        <div class="weather-details">
+          <div class="detail-item">
+            <div class="detail-icon">💨</div>
+            <div class="detail-value">{{ Math.round(weather.windspeed) }} km/h</div>
+            <div class="detail-label">Viento</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-icon">💧</div>
+            <div class="detail-value">{{ weather.humidity }}%</div>
+            <div class="detail-label">Humedad</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-icon">🌡️</div>
+            <div class="detail-value">{{ Math.round(weather.apparent_temperature) }}°C</div>
+            <div class="detail-label">Sensación</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5-day forecast -->
+      <div v-if="forecast.length > 0">
+        <div class="section-title">Pronóstico 5 días</div>
+        <div class="forecast-grid">
+          <div class="forecast-day" v-for="day in forecast" :key="day.date">
+            <div class="forecast-day-name">{{ day.name }}</div>
+            <div class="forecast-icon">{{ getWeatherIcon(day.weathercode) }}</div>
+            <div class="forecast-temp-max">{{ Math.round(day.max) }}°</div>
+            <div class="forecast-temp-min">{{ Math.round(day.min) }}°</div>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <!-- Empty state -->
+    <div class="empty-state" v-if="!weather && !loading && !error">
+      <div class="big-icon">🌍</div>
+      <p>Buscá cualquier ciudad del mundo<br>para ver el clima en tiempo real</p>
+    </div>
+
+    <!-- Recent searches -->
+    <div class="recent-searches" v-if="recentSearches.length > 0">
+      <div class="section-title">Búsquedas recientes</div>
+      <div class="recent-chips">
+        <span
+          class="recent-chip"
+          v-for="city in recentSearches"
+          :key="city.name"
+          @click="selectCity(city)"
+        >{{ city.name }}</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/vue@3.4.21/dist/vue.global.prod.js"></script>
+<script>
+const { createApp, ref, onMounted } = Vue;
+
+// Weather code mappings
+const WEATHER_ICONS = {
+  0: '☀️', 1: '🌤️', 2: '⛅', 3: '☁️',
+  45: '🌫️', 48: '🌫️',
+  51: '🌦️', 53: '🌦️', 55: '🌧️',
+  61: '🌧️', 63: '🌧️', 65: '🌧️',
+  71: '❄️', 73: '❄️', 75: '❄️',
+  80: '🌦️', 81: '🌧️', 82: '⛈️',
+  95: '⛈️', 96: '⛈️', 99: '⛈️',
+};
+
+const WEATHER_DESC = {
+  0: 'Despejado', 1: 'Mayormente despejado', 2: 'Parcialmente nublado', 3: 'Nublado',
+  45: 'Niebla', 48: 'Niebla con escarcha',
+  51: 'Llovizna leve', 53: 'Llovizna moderada', 55: 'Llovizna intensa',
+  61: 'Lluvia leve', 63: 'Lluvia moderada', 65: 'Lluvia intensa',
+  71: 'Nieve leve', 73: 'Nieve moderada', 75: 'Nieve intensa',
+  80: 'Chubascos leves', 81: 'Chubascos moderados', 82: 'Chubascos intensos',
+  95: 'Tormenta eléctrica', 96: 'Tormenta con granizo', 99: 'Tormenta fuerte',
+};
+
+createApp({
+  setup() {
+    const query = ref('');
+    const weather = ref(null);
+    const forecast = ref([]);
+    const suggestions = ref([]);
+    const recentSearches = ref([]);
+    const loading = ref(false);
+    const error = ref('');
+    let suggestTimer = null;
+
+    const getWeatherIcon = (code) => WEATHER_ICONS[code] ?? '🌡️';
+    const getWeatherDesc = (code) => WEATHER_DESC[code] ?? 'Desconocido';
+
+    // Debounced city suggestions from geocoding API
+    function onInput() {
+      clearTimeout(suggestTimer);
+      suggestions.value = [];
+      error.value = '';
+      if (query.value.trim().length < 2) return;
+      suggestTimer = setTimeout(fetchSuggestions, 400);
+    }
+
+    async function fetchSuggestions() {
+      try {
+        const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query.value)}&count=5&language=es&format=json`;
+        const res = await fetch(url);
+        const data = await res.json();
+        suggestions.value = data.results || [];
+      } catch(e) {
+        suggestions.value = [];
+      }
+    }
+
+    async function searchCity() {
+      if (!query.value.trim()) return;
+      await fetchSuggestions();
+      if (suggestions.value.length > 0) {
+        await selectCity(suggestions.value[0]);
+      } else {
+        error.value = 'No se encontró la ciudad. Probá con otro nombre.';
+      }
+    }
+
+    async function selectCity(city) {
+      suggestions.value = [];
+      query.value = city.name;
+      loading.value = true;
+      error.value = '';
+      weather.value = null;
+      forecast.value = [];
+
+      try {
+        const lat = city.latitude;
+        const lon = city.longitude;
+
+        // Fetch current weather + daily forecast + hourly humidity
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&daily=weathercode,temperature_2m_max,temperature_2m_min&hourly=relativehumidity_2m,apparent_temperature&timezone=auto&forecast_days=5`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('Error al obtener el clima');
+        const data = await res.json();
+
+        const cw = data.current_weather;
+        const currentHourIdx = data.hourly.time.findIndex(t => t.startsWith(cw.time.slice(0, 13)));
+
+        weather.value = {
+          city: city.name,
+          country: city.country,
+          temperature: cw.temperature,
+          weathercode: cw.weathercode,
+          windspeed: cw.windspeed,
+          humidity: data.hourly.relativehumidity_2m[currentHourIdx >= 0 ? currentHourIdx : 0],
+          apparent_temperature: data.hourly.apparent_temperature[currentHourIdx >= 0 ? currentHourIdx : 0],
+        };
+
+        // Build 5-day forecast
+        const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+        forecast.value = data.daily.time.map((date, i) => ({
+          date,
+          name: i === 0 ? 'Hoy' : days[new Date(date + 'T12:00:00').getDay()],
+          max: data.daily.temperature_2m_max[i],
+          min: data.daily.temperature_2m_min[i],
+          weathercode: data.daily.weathercode[i],
+        }));
+
+        // Save to recent searches
+        const cityData = { name: city.name, country: city.country, latitude: lat, longitude: lon };
+        recentSearches.value = [cityData, ...recentSearches.value.filter(c => c.name !== city.name)].slice(0, 5);
+        saveRecent();
+
+      } catch(e) {
+        error.value = 'No se pudo obtener el clima. Verificá tu conexión.';
+      } finally {
+        loading.value = false;
+      }
+    }
+
+    function saveRecent() {
+      try { localStorage.setItem('clima-vue-recent', JSON.stringify(recentSearches.value)); } catch(e) {}
+    }
+
+    onMounted(() => {
+      try {
+        const saved = localStorage.getItem('clima-vue-recent');
+        if (saved) recentSearches.value = JSON.parse(saved);
+      } catch(e) {}
+
+      // Load Buenos Aires by default
+      selectCity({ name: 'Buenos Aires', country: 'Argentina', latitude: -34.6037, longitude: -58.3816 });
+    });
+
+    return {
+      query, weather, forecast, suggestions, recentSearches,
+      loading, error,
+      getWeatherIcon, getWeatherDesc,
+      onInput, searchCity, selectCity
+    };
+  }
+}).mount('#app');
+</script>
+</body>
+</html>
